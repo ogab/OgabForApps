@@ -15,13 +15,29 @@ import sys
 import time
 from datetime import datetime
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
+import hashlib
+import urllib3
+
+# Selenium (optional — not needed in --http-only mode)
+try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.ui import WebDriverWait
+    from webdriver_manager.chrome import ChromeDriverManager
+    HAS_SELENIUM = True
+except ImportError:
+    HAS_SELENIUM = False
+
+# HTTP fallback (requests + BeautifulSoup)
+try:
+    import requests as http_requests
+    from bs4 import BeautifulSoup
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
 
 
 # ── Couleurs console ──────────────────────────────────────────────────────────
@@ -56,7 +72,8 @@ TAB_NAMES = ["Publicité", "Question", "Groupement", "Dépôt", "Messagerie"]
 
 
 class PublicTracker:
-    def __init__(self, refs, org=None, interval=120, headless=True, csv_path="tracker_log.csv"):
+    def __init__(self, refs, org=None, interval=120, headless=True, csv_path="tracker_log.csv",
+                 http_only=False):
         self.refs = refs
         self.org = org
         self.interval = interval
@@ -65,10 +82,44 @@ class PublicTracker:
         self.driver = None
         self.previous_states = {}
         self._running = True
+        self.use_http = http_only
+        self.session = None
+
+    # ── HTTP session setup (fallback mode) ──
+
+    def _init_http_session(self):
+        if not HAS_REQUESTS:
+            raise RuntimeError(
+                "Mode HTTP requis mais 'requests' non installe.\n"
+                "Installez: pip3 install requests beautifulsoup4"
+            )
+        self.session = http_requests.Session()
+        self.session.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "fr-FR,fr;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        })
+        self.session.verify = False
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        self.use_http = True
+        print(f"{Colors.CYAN}  Session HTTP initialisee (mode sans navigateur){Colors.RESET}")
 
     # ── Browser setup ──
 
     def start_browser(self, enable_network_logging=False):
+        if self.use_http:
+            if not self.session:
+                self._init_http_session()
+            return
+
+        if not HAS_SELENIUM:
+            print(f"{Colors.YELLOW}  Selenium non installe. Basculement en mode HTTP...{Colors.RESET}")
+            self._init_http_session()
+            return
+
         opts = Options()
         if self.headless:
             opts.add_argument("--headless=new")
@@ -89,10 +140,27 @@ class PublicTracker:
             opts.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
         try:
+            # Fix SSL errors on macOS (self-signed cert in proxy chain)
+            os.environ['WDM_SSL_VERIFY'] = '0'
             service = Service(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=opts)
-        except Exception:
-            self.driver = webdriver.Chrome(options=opts)
+        except Exception as e1:
+            try:
+                self.driver = webdriver.Chrome(options=opts)
+            except Exception as e2:
+                if HAS_REQUESTS:
+                    print(f"{Colors.YELLOW}  Chrome/ChromeDriver indisponible: {e2}{Colors.RESET}")
+                    print(f"{Colors.YELLOW}  Basculement automatique en mode HTTP...{Colors.RESET}")
+                    self._init_http_session()
+                    return
+                else:
+                    print(f"\n{Colors.RED}Chrome/ChromeDriver introuvable et 'requests' non installe.{Colors.RESET}")
+                    print(f"{Colors.YELLOW}Solutions:{Colors.RESET}")
+                    print(f"  1. Installer Chrome: https://google.com/chrome")
+                    print(f"  2. Fix SSL Mac: /Applications/Python\\ 3.x/Install\\ Certificates.command")
+                    print(f"  3. Mode HTTP (sans Chrome): pip3 install requests beautifulsoup4")
+                    print(f"     puis relancer avec --http-only")
+                    raise
 
         self.driver.set_page_load_timeout(30)
         self.driver.implicitly_wait(5)
@@ -110,6 +178,111 @@ class PublicTracker:
             except Exception:
                 pass
             self.driver = None
+
+    # ── HTTP fallback methods ──
+
+    def _http_get(self, url, max_retries=3):
+        for attempt in range(max_retries):
+            try:
+                resp = self.session.get(url, timeout=30)
+                return resp.text
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait = 3 * (attempt + 1)
+                    print(f"{Colors.YELLOW}  Tentative HTTP {attempt+1}/{max_retries} echouee. "
+                          f"Retry dans {wait}s...{Colors.RESET}")
+                    time.sleep(wait)
+                else:
+                    print(f"{Colors.RED}  Echec HTTP apres {max_retries} tentatives: {e}{Colors.RESET}")
+                    return None
+
+    def _extract_header_from_html(self, html):
+        """Extract header info using regex (works with raw HTML, no Selenium needed)."""
+        info = {"reference": "", "objet": "", "date_limite": "", "statut": "", "organisme": ""}
+        if not html:
+            return info
+
+        # Reference
+        m = re.search(r"R[ée]f[ée]rence\s*:?\s*</[^>]+>\s*([^<]+)", html)
+        if not m:
+            m = re.search(r"R[ée]f[ée]rence\s*:?\s*([^<\n]+)", html)
+        if m:
+            info["reference"] = m.group(1).strip()
+
+        # Objet
+        m = re.search(r"Objet\s*(?:de la consultation)?\s*:?\s*</[^>]+>\s*([^<]+)", html)
+        if not m:
+            m = re.search(r"Objet\s*:?\s*([^<\n]+)", html)
+        if m:
+            info["objet"] = m.group(1).strip()
+
+        # Date limite
+        m = re.search(r"Date\s+et\s+heure\s+limite[^:]*:\s*</[^>]+>\s*([^<]+)", html)
+        if not m:
+            m = re.search(r"Date\s+et\s+heure\s+limite[^:]*:\s*([^<\n]+)", html)
+        if m:
+            info["date_limite"] = m.group(1).strip()
+
+        # Statut
+        m = re.search(r"Statut\s*:?\s*</[^>]+>\s*([^<]+)", html)
+        if not m:
+            m = re.search(r"Statut\s*:?\s*([^<\n]+)", html)
+        if m:
+            info["statut"] = m.group(1).strip()
+
+        # Organisme
+        m = re.search(r"Organisme\s*:?\s*</[^>]+>\s*([^<]+)", html)
+        if not m:
+            m = re.search(r"Acheteur\s*:?\s*</[^>]+>\s*([^<]+)", html)
+        if m:
+            info["organisme"] = m.group(1).strip()
+
+        return info
+
+    def _http_scrape_public(self, ref, org=None):
+        """Scrape a consultation using HTTP requests (no browser)."""
+        state = ConsultationState()
+
+        url = self._build_url(ref, org)
+        html = self._http_get(url)
+        if not html:
+            return state
+
+        # Extract header from raw HTML
+        header = self._extract_header_from_html(html)
+        state.reference = header.get("reference", ref)
+        state.objet = header.get("objet", "")
+        state.date_limite = header.get("date_limite", "")
+        state.statut = header.get("statut", "")
+        state.organisme = header.get("organisme", "")
+
+        # Extract visible text for change detection
+        if HAS_REQUESTS:
+            try:
+                soup = BeautifulSoup(html, "html.parser")
+                # Remove script/style tags
+                for tag in soup(["script", "style"]):
+                    tag.decompose()
+                full_text = soup.get_text(separator="\n", strip=True)
+                state.page_hash = hashlib.md5(full_text.encode()).hexdigest()
+
+                # Extract tables as basic tab content
+                tables = soup.find_all("table")
+                for table in tables:
+                    rows = table.find_all("tr")
+                    for row in rows[1:]:
+                        cells = row.find_all("td")
+                        if len(cells) >= 2:
+                            cell_texts = [c.get_text(strip=True) for c in cells]
+                            if any(cell_texts):
+                                state.tabs.setdefault("_tables", {"text": "", "rows": []})
+                                state.tabs["_tables"]["rows"].append(cell_texts)
+            except Exception:
+                state.page_hash = hashlib.md5(html.encode()).hexdigest()
+        else:
+            state.page_hash = hashlib.md5(html.encode()).hexdigest()
+
+        return state
 
     # ── URL construction ──
 
@@ -353,6 +526,12 @@ class PublicTracker:
         return result
 
     def run_discovery(self):
+        if self.use_http:
+            print(f"\n{Colors.RED}Le mode Discovery necessite Chrome/Selenium (clics onglets + CDP).{Colors.RESET}")
+            print(f"{Colors.YELLOW}Utilisez le mode Monitor avec --http-only pour la surveillance HTTP.{Colors.RESET}")
+            print(f"{Colors.YELLOW}Ou installez Chrome pour le mode Discovery.{Colors.RESET}")
+            return
+
         ref = self.refs[0]
         org = self.org
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -551,6 +730,9 @@ class PublicTracker:
     # ── Monitor mode: scraping ──
 
     def scrape_public(self, ref, org=None):
+        if self.use_http:
+            return self._http_scrape_public(ref, org)
+
         state = ConsultationState()
 
         url = self._build_url(ref, org)
@@ -694,11 +876,12 @@ class PublicTracker:
         signal.signal(signal.SIGINT, self._handle_exit)
         signal.signal(signal.SIGTERM, self._handle_exit)
 
+        mode_label = "HTTP (sans navigateur)" if self.use_http else f"Selenium (headless={self.headless})"
         print(f"\n{Colors.BOLD}Demarrage du monitoring anonyme...{Colors.RESET}")
         print(f"  Consultations: {', '.join(self.refs)}")
         print(f"  Intervalle: {self.interval}s")
         print(f"  CSV: {self.csv_path}")
-        print(f"  Headless: {self.headless}\n")
+        print(f"  Mode: {mode_label}\n")
 
         self.start_browser(enable_network_logging=False)
         try:
@@ -772,10 +955,19 @@ def main():
         "--csv-log", default="tracker_log.csv",
         help="Chemin vers le fichier CSV de log (defaut: tracker_log.csv)"
     )
+    parser.add_argument(
+        "--http-only", action="store_true",
+        help="Mode HTTP direct (sans Chrome/Selenium). Fonctionne partout, mais pas de clics onglets."
+    )
     args = parser.parse_args()
 
     refs = [r.strip() for r in args.ref.split(",")]
     headless = not args.no_headless
+
+    if args.http_only and not HAS_REQUESTS:
+        print(f"Erreur: --http-only necessite 'requests' et 'beautifulsoup4'.")
+        print(f"Installez: pip3 install requests beautifulsoup4")
+        sys.exit(1)
 
     tracker = PublicTracker(
         refs=refs,
@@ -783,6 +975,7 @@ def main():
         interval=args.interval,
         headless=headless,
         csv_path=args.csv_log,
+        http_only=args.http_only,
     )
 
     if args.discover:

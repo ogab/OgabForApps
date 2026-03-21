@@ -2,3 +2,6 @@ config.json
 __pycache__/
 *.pyc
 .env
+discovery_report_*.txt
+page_source_*.html
+tracker_log.csv

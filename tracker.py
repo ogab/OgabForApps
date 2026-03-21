@@ -70,6 +70,23 @@ class ConsultationState:
 BASE_URL = "https://www.marchespublics.gov.ma"
 TAB_NAMES = ["Publicité", "Question", "Groupement", "Dépôt", "Messagerie"]
 
+# Known public pages (accessible without authentication)
+PUBLIC_PAGES = {
+    "annonces": f"{BASE_URL}/index.php?page=entreprise.EntrepriseAnnonceList",
+    "recherche": f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch",
+    "societes_exclues": f"{BASE_URL}/index.php?page=entreprise.EntrepriseSocietesExclues",
+    "aide": f"{BASE_URL}/index.php?page=entreprise.EntrepriseAide",
+    "preparer": f"{BASE_URL}/index.php?page=entreprise.EntreprisePreparerRepondre",
+}
+
+# Indicators that we've been denied access / redirected to login
+ACCESS_DENIED_INDICATORS = [
+    "Vous n'avez pas le droit d'accéder",
+    "Vous n'êtes pas authentifié",
+    "S'identifier",
+    "Accès refusé",
+]
+
 
 class PublicTracker:
     def __init__(self, refs, org=None, interval=120, headless=True, csv_path="tracker_log.csv",
@@ -243,9 +260,17 @@ class PublicTracker:
         """Scrape a consultation using HTTP requests (no browser)."""
         state = ConsultationState()
 
+        # Try direct consultation page first
         url = self._build_url(ref, org)
         html = self._http_get(url)
+
         if not html:
+            return state
+
+        # Check if access is denied — try Annonces search as fallback
+        if self._is_access_denied(html):
+            print(f"{Colors.YELLOW}  Page details protegee. Recherche via Annonces...{Colors.RESET}")
+            state = self._http_search_annonces(ref)
             return state
 
         # Extract header from raw HTML
@@ -257,30 +282,108 @@ class PublicTracker:
         state.organisme = header.get("organisme", "")
 
         # Extract visible text for change detection
-        if HAS_REQUESTS:
-            try:
-                soup = BeautifulSoup(html, "html.parser")
-                # Remove script/style tags
-                for tag in soup(["script", "style"]):
-                    tag.decompose()
-                full_text = soup.get_text(separator="\n", strip=True)
-                state.page_hash = hashlib.md5(full_text.encode()).hexdigest()
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+            for tag in soup(["script", "style"]):
+                tag.decompose()
+            full_text = soup.get_text(separator="\n", strip=True)
+            state.page_hash = hashlib.md5(full_text.encode()).hexdigest()
 
-                # Extract tables as basic tab content
-                tables = soup.find_all("table")
-                for table in tables:
-                    rows = table.find_all("tr")
-                    for row in rows[1:]:
-                        cells = row.find_all("td")
-                        if len(cells) >= 2:
-                            cell_texts = [c.get_text(strip=True) for c in cells]
-                            if any(cell_texts):
-                                state.tabs.setdefault("_tables", {"text": "", "rows": []})
-                                state.tabs["_tables"]["rows"].append(cell_texts)
-            except Exception:
-                state.page_hash = hashlib.md5(html.encode()).hexdigest()
-        else:
+            # Extract tables as basic tab content
+            tables = soup.find_all("table")
+            for table in tables:
+                rows = table.find_all("tr")
+                for row in rows[1:]:
+                    cells = row.find_all("td")
+                    if len(cells) >= 2:
+                        cell_texts = [c.get_text(strip=True) for c in cells]
+                        if any(cell_texts):
+                            state.tabs.setdefault("_tables", {"text": "", "rows": []})
+                            state.tabs["_tables"]["rows"].append(cell_texts)
+        except Exception:
             state.page_hash = hashlib.md5(html.encode()).hexdigest()
+
+        return state
+
+    def _http_search_annonces(self, ref):
+        """Search for a consultation in the public Annonces page."""
+        state = ConsultationState()
+        state.reference = ref
+
+        # Try multiple public page patterns for the Annonces/search
+        search_urls = [
+            f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch&AllCons=1",
+            f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch",
+            PUBLIC_PAGES["annonces"],
+            f"{BASE_URL}/index.php?page=entreprise.EntrepriseConsultationList",
+            # Direct search with reference parameter
+            f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch&refConsultation={ref}",
+        ]
+
+        for url in search_urls:
+            html = self._http_get(url)
+            if not html or self._is_access_denied(html):
+                continue
+
+            # Check if the reference appears on this page
+            if str(ref) in html:
+                print(f"{Colors.GREEN}  Ref {ref} trouvee sur: {url.split('page=')[1][:50]}{Colors.RESET}")
+                state = self._extract_from_listing(html, ref)
+                state.page_hash = hashlib.md5(html.encode()).hexdigest()
+                return state
+
+        print(f"{Colors.YELLOW}  Ref {ref} non trouvee dans les pages publiques.{Colors.RESET}")
+        # Still hash the last page we got for change detection
+        state.objet = "(acces protege - consultation non visible publiquement)"
+        return state
+
+    def _extract_from_listing(self, html, ref):
+        """Extract consultation info from a listing/search results page."""
+        state = ConsultationState()
+        state.reference = str(ref)
+
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+
+            # Find the row containing the reference
+            ref_str = str(ref)
+            # Look in table rows
+            for tr in soup.find_all("tr"):
+                cells = tr.find_all("td")
+                row_text = tr.get_text()
+                if ref_str not in row_text:
+                    continue
+
+                cell_texts = [c.get_text(strip=True) for c in cells]
+                # Try to extract structured data from the row
+                for i, text in enumerate(cell_texts):
+                    if ref_str in text:
+                        state.reference = text
+                    # Heuristic: date patterns
+                    elif re.search(r"\d{2}/\d{2}/\d{4}", text):
+                        if not state.date_limite:
+                            state.date_limite = text
+                    # Long text is likely the object
+                    elif len(text) > 30 and not state.objet:
+                        state.objet = text
+
+                # Store full row for monitoring
+                if cell_texts:
+                    state.tabs["listing"] = {"text": " | ".join(cell_texts), "rows": [cell_texts]}
+                break
+
+            # Also look in divs/spans that might contain the info
+            if not state.objet:
+                for el in soup.find_all(string=re.compile(ref_str)):
+                    parent = el.find_parent(["tr", "div", "li"])
+                    if parent:
+                        full_text = parent.get_text(separator=" ", strip=True)
+                        if len(full_text) > len(ref_str) + 10:
+                            state.objet = full_text[:200]
+                            break
+
+        except Exception as e:
+            print(f"{Colors.DIM}  Erreur extraction listing: {e}{Colors.RESET}")
 
         return state
 
@@ -291,6 +394,13 @@ class PublicTracker:
         if org:
             url += f"&orgAcronyme={org}"
         return url
+
+    def _is_access_denied(self, html):
+        """Check if page shows access denied / login required."""
+        if not html:
+            return False
+        text = html.lower() if len(html) < 50000 else html[:50000].lower()
+        return any(ind.lower() in text for ind in ACCESS_DENIED_INDICATORS)
 
     # ── Page loading with retry ──
 
@@ -307,6 +417,10 @@ class PublicTracker:
                                    " | //table")
                     )
                 )
+                # Check for access denied
+                if self._is_access_denied(self.driver.page_source):
+                    print(f"{Colors.RED}  ACCES REFUSE: Cette page necessite une authentification.{Colors.RESET}")
+                    return False
                 return True
             except Exception as e:
                 if attempt < max_retries - 1:
@@ -503,13 +617,8 @@ class PublicTracker:
             result["content_preview"] = page_text
 
             # Check if we got real content vs error/login page
-            error_indicators = [
-                "Vous n'êtes pas authentifié",
-                "S'identifier",
-                "Erreur",
-                "403",
-                "Page introuvable",
-                "Accès refusé",
+            error_indicators = ACCESS_DENIED_INDICATORS + [
+                "Erreur", "403", "Page introuvable",
             ]
             login_redirect = any(ind.lower() in page_text.lower() for ind in error_indicators)
 
@@ -546,16 +655,23 @@ class PublicTracker:
         self.start_browser(enable_network_logging=True)
         try:
             # ── Phase 1: Load public page and capture network ──
-            print(f"{Colors.CYAN}[1/5] Chargement de la page publique...{Colors.RESET}")
+            print(f"{Colors.CYAN}[1/6] Chargement de la page consultation...{Colors.RESET}")
             url = self._build_url(ref, org)
-            self._load_page(url)
+            page_loaded = self._load_page(url)
 
-            header = self._extract_header()
-            findings.append("=== INFORMATIONS CONSULTATION ===")
-            findings.append(f"URL: {url}")
-            findings.append(f"Reference: {header.get('reference', 'N/A')}")
-            findings.append(f"Objet: {header.get('objet', 'N/A')}")
-            findings.append(f"Date limite: {header.get('date_limite', 'N/A')}")
+            if not page_loaded:
+                findings.append("=== PAGE CONSULTATION: ACCES REFUSE ===")
+                findings.append(f"URL: {url}")
+                findings.append("La page details necessite une authentification entreprise.")
+                findings.append("Exploration des pages publiques alternatives...\n")
+                print(f"{Colors.YELLOW}  Page details protegee. Exploration des alternatives...{Colors.RESET}")
+            else:
+                header = self._extract_header()
+                findings.append("=== INFORMATIONS CONSULTATION ===")
+                findings.append(f"URL: {url}")
+                findings.append(f"Reference: {header.get('reference', 'N/A')}")
+                findings.append(f"Objet: {header.get('objet', 'N/A')}")
+                findings.append(f"Date limite: {header.get('date_limite', 'N/A')}")
             findings.append("")
 
             initial_requests = self._get_network_logs()
@@ -570,10 +686,13 @@ class PublicTracker:
             print(f"  {len(initial_requests)} requetes reseau capturees")
 
             # ── Phase 2: Click each tab and capture XHR ──
-            print(f"\n{Colors.CYAN}[2/5] Exploration des onglets...{Colors.RESET}")
+            if page_loaded:
+                print(f"\n{Colors.CYAN}[2/6] Exploration des onglets...{Colors.RESET}")
+            else:
+                print(f"\n{Colors.CYAN}[2/6] Onglets non disponibles (acces refuse).{Colors.RESET}")
             findings.append("=== CONTENU DES ONGLETS ===")
 
-            for tab in TAB_NAMES:
+            for tab in (TAB_NAMES if page_loaded else []):
                 print(f"  Onglet: {tab}...", end=" ")
                 # Clear previous logs
                 self._get_network_logs()
@@ -603,22 +722,36 @@ class PublicTracker:
 
             findings.append("")
 
-            # ── Phase 3: Probe agent URLs without auth ──
-            print(f"\n{Colors.CYAN}[3/5] Sondage des URLs agent sans authentification...{Colors.RESET}")
-            findings.append("=== SONDAGE URLs AGENT (SANS AUTH) ===")
+            # ── Phase 3: Probe public + agent URLs without auth ──
+            print(f"\n{Colors.CYAN}[3/6] Sondage des pages publiques et URLs agent...{Colors.RESET}")
+            findings.append("=== SONDAGE URLs (SANS AUTH) ===")
 
+            # Public pages visible in sidebar (no auth)
             probe_urls = [
-                (f"{BASE_URL}/index.php?page=agent.GestionRegistres&ref={ref}", "GestionRegistres (sans type)"),
+                (PUBLIC_PAGES["annonces"], "Annonces (liste publique)"),
+                (PUBLIC_PAGES["recherche"], "Recherche avancee"),
+                (PUBLIC_PAGES["societes_exclues"], "Societes exclues"),
+                (PUBLIC_PAGES["aide"], "Aide"),
+                (PUBLIC_PAGES["preparer"], "Se preparer a repondre"),
+                (f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch&AllCons=1",
+                 "Recherche avancee (AllCons)"),
+                (f"{BASE_URL}/index.php?page=entreprise.EntrepriseConsultationList", "Liste consultations"),
             ]
-            for t in range(1, 11):
+            # Also try the detail page (now requires auth, but let's confirm)
+            probe_urls.append(
+                (self._build_url(ref, org), "Details consultation (auth?)")
+            )
+            # Agent pages
+            probe_urls.append(
+                (f"{BASE_URL}/index.php?page=agent.GestionRegistres&ref={ref}", "GestionRegistres (sans type)")
+            )
+            for t in range(1, 6):
                 probe_urls.append(
                     (f"{BASE_URL}/index.php?page=agent.GestionRegistres&ref={ref}&type={t}",
                      f"GestionRegistres type={t}")
                 )
-            # Additional URL patterns to try
+            # Other entreprise endpoints
             probe_urls.extend([
-                (f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch", "Recherche avancee"),
-                (f"{BASE_URL}/index.php?page=entreprise.EntrepriseConsultationList", "Liste consultations"),
                 (f"{BASE_URL}/index.php?page=entreprise.EntrepriseResultats&refConsultation={ref}",
                  "Resultats consultation"),
                 (f"{BASE_URL}/index.php?page=entreprise.EntrepriseRegistres&ref={ref}", "Registres entreprise"),
@@ -651,11 +784,23 @@ class PublicTracker:
             findings.append("")
 
             # ── Phase 4: Analyze PRADO callbacks ──
-            print(f"\n{Colors.CYAN}[4/5] Analyse des callbacks PRADO...{Colors.RESET}")
+            print(f"\n{Colors.CYAN}[4/6] Analyse des callbacks PRADO...{Colors.RESET}")
             findings.append("=== ANALYSE PRADO ===")
 
-            # Reload the consultation page to get fresh PRADO state
-            self._load_page(url)
+            # Load a page with PRADO state (use consultation page or first accessible public page)
+            if page_loaded:
+                self._load_page(url)
+            else:
+                # Try to load any public page for PRADO analysis
+                for pname, purl in PUBLIC_PAGES.items():
+                    try:
+                        self.driver.get(purl)
+                        time.sleep(3)
+                        if not self._is_access_denied(self.driver.page_source):
+                            print(f"  Analyse PRADO sur page '{pname}'")
+                            break
+                    except Exception:
+                        continue
             page_source = self.driver.page_source
 
             # Extract PRADO_PAGESTATE
@@ -695,7 +840,7 @@ class PublicTracker:
             findings.append("")
 
             # ── Phase 5: Save page source for manual inspection ──
-            print(f"\n{Colors.CYAN}[5/5] Sauvegarde du code source pour inspection...{Colors.RESET}")
+            print(f"\n{Colors.CYAN}[5/6] Sauvegarde du code source pour inspection...{Colors.RESET}")
             source_path = f"page_source_{ref}_{timestamp}.html"
             with open(source_path, "w", encoding="utf-8") as f:
                 f.write(page_source)
@@ -715,14 +860,23 @@ class PublicTracker:
             print(f"{Colors.GREEN}  Source HTML: {source_path}{Colors.RESET}")
             print(f"{Colors.BOLD}{Colors.GREEN}{'=' * 60}{Colors.RESET}")
 
-            # Summary
-            print(f"\n{Colors.BOLD}Resume:{Colors.RESET}")
+            # ── Phase 6: Summary ──
+            print(f"\n{Colors.CYAN}[6/6] Resume:{Colors.RESET}")
+            accessible_pages = [f for f in findings if "Accessible: True" in f]
             data_urls = [f for f in findings if "DONNEES TROUVEES" in f]
+
+            if not page_loaded:
+                print(f"  {Colors.RED}Page details consultation: ACCES REFUSE (auth entreprise requise){Colors.RESET}")
+
+            if accessible_pages:
+                print(f"  {Colors.GREEN}{len(accessible_pages)} page(s) accessible(s) sans auth{Colors.RESET}")
             if data_urls:
-                print(f"  {Colors.GREEN}{len(data_urls)} endpoint(s) avec donnees accessibles!{Colors.RESET}")
+                print(f"  {Colors.GREEN}{len(data_urls)} endpoint(s) avec donnees interessantes!{Colors.RESET}")
             else:
                 print(f"  {Colors.YELLOW}Aucun endpoint avec donnees bidder trouve sans auth.{Colors.RESET}")
-                print(f"  Les donnees de retraits/depots sont protegees par l'authentification agent.")
+                print(f"  Les donnees de retraits/depots sont protegees par l'authentification.")
+                print(f"  {Colors.CYAN}Conseil: Utilisez --http-only pour surveiller les pages publiques{Colors.RESET}")
+                print(f"  {Colors.CYAN}  (Annonces, recherche) ou connectez-vous en tant qu'entreprise.{Colors.RESET}")
 
         finally:
             self.stop_browser()
@@ -737,6 +891,23 @@ class PublicTracker:
 
         url = self._build_url(ref, org)
         if not self._load_page(url):
+            # Page requires auth — try Annonces page via Selenium
+            print(f"{Colors.YELLOW}  Tentative via page Annonces...{Colors.RESET}")
+            for page_name, page_url in PUBLIC_PAGES.items():
+                try:
+                    self.driver.get(page_url)
+                    time.sleep(3)
+                    page_text = self.driver.find_element(By.TAG_NAME, "body").text
+                    if str(ref) in page_text or str(ref) in self.driver.page_source:
+                        print(f"{Colors.GREEN}  Ref trouvee sur page '{page_name}'{Colors.RESET}")
+                        state.reference = str(ref)
+                        state.objet = f"(visible sur page {page_name})"
+                        state.page_hash = str(hash(page_text))
+                        return state
+                except Exception:
+                    continue
+            state.reference = str(ref)
+            state.objet = "(acces protege - authentification requise)"
             return state
 
         # Header

@@ -1,0 +1,13 @@
+{
+  "username": "votre_login",
+  "password": "votre_mot_de_passe",
+  "base_url": "https://www.marchespublics.gov.ma",
+  "consultations": [
+    {
+      "ref": "979388",
+      "label": "06/2026/DPA/1/SAHA"
+    }
+  ],
+  "poll_interval_seconds": 120,
+  "headless": true
+}

@@ -74,10 +74,71 @@ TAB_NAMES = ["Publicité", "Question", "Groupement", "Dépôt", "Messagerie"]
 PUBLIC_PAGES = {
     "annonces": f"{BASE_URL}/index.php?page=entreprise.EntrepriseAnnonceList",
     "recherche": f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch",
+    "recherche_all": f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch&AllCons",
     "societes_exclues": f"{BASE_URL}/index.php?page=entreprise.EntrepriseSocietesExclues",
     "aide": f"{BASE_URL}/index.php?page=entreprise.EntrepriseAide",
     "preparer": f"{BASE_URL}/index.php?page=entreprise.EntreprisePreparerRepondre",
+    "home": f"{BASE_URL}/index.php?page=entreprise.EntrepriseHome",
 }
+
+# Smart bypass strategies — alternative URL patterns to reach consultation data
+BYPASS_STRATEGIES = [
+    # 1. Download JAL notice (legal announcement — public document)
+    {
+        "name": "Avis JAL (annonce legale)",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseDownloadAvisJAL"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "download",
+    },
+    # 2. Advanced search with AllCons + refConsultation filter
+    {
+        "name": "Recherche avancee (AllCons + ref)",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseAdvancedSearch"
+                        "&AllCons&refConsultation={ref}",
+        "needs_org": False,
+        "type": "search",
+    },
+    # 3. Alternative /pmmp/spg/ path (non-PRADO routing)
+    {
+        "name": "Chemin /pmmp/spg/ (hors PRADO)",
+        "url_template": BASE_URL + "/pmmp/spg/entreprise/EntrepriseAdvancedSearch.htm"
+                        "?type=AllCons&refConsultation={ref}",
+        "needs_org": False,
+        "type": "search",
+    },
+    # 4. Direct consultation via SPIP portal
+    {
+        "name": "SPIP portail (pmmp)",
+        "url_template": BASE_URL + "/pmmp/spip.php?page=backend",
+        "needs_org": False,
+        "type": "rss",
+    },
+    # 5. Google cache of the consultation page
+    {
+        "name": "Google Cache",
+        "url_template": "https://webcache.googleusercontent.com/search?q=cache:"
+                        "marchespublics.gov.ma/index.php?page=entreprise."
+                        "EntrepriseDetailsConsultation%26refConsultation={ref}",
+        "needs_org": False,
+        "type": "cache",
+    },
+    # 6. Consultation list (may show ref in results)
+    {
+        "name": "Liste consultations",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseConsultationList",
+        "needs_org": False,
+        "type": "list",
+    },
+    # 7. Resultats consultation (sometimes public post-attribution)
+    {
+        "name": "Resultats consultation",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseResultats"
+                        "&refConsultation={ref}",
+        "needs_org": False,
+        "type": "results",
+    },
+]
 
 # Indicators that we've been denied access / redirected to login
 ACCESS_DENIED_INDICATORS = [
@@ -267,9 +328,13 @@ class PublicTracker:
         if not html:
             return state
 
-        # Check if access is denied — try Annonces search as fallback
+        # Check if access is denied — try smart bypass strategies
         if self._is_access_denied(html):
-            print(f"{Colors.YELLOW}  Page details protegee. Recherche via Annonces...{Colors.RESET}")
+            print(f"{Colors.YELLOW}  Page details protegee. Tentative bypass intelligent...{Colors.RESET}")
+            state = self._try_bypass_strategies(ref, org)
+            if state.objet or state.date_limite:
+                return state
+            # Last resort: search Annonces
             state = self._http_search_annonces(ref)
             return state
 
@@ -303,6 +368,117 @@ class PublicTracker:
         except Exception:
             state.page_hash = hashlib.md5(html.encode()).hexdigest()
 
+        return state
+
+    def _try_bypass_strategies(self, ref, org=None):
+        """Try multiple smart strategies to access consultation data without direct auth."""
+        state = ConsultationState()
+        state.reference = str(ref)
+        org = org or ""
+
+        for strategy in BYPASS_STRATEGIES:
+            if strategy["needs_org"] and not org:
+                continue
+
+            name = strategy["name"]
+            url = strategy["url_template"].format(ref=ref, org=org)
+
+            print(f"{Colors.DIM}    Strategie: {name}...{Colors.RESET}", end=" ")
+
+            if strategy["type"] == "download":
+                # For download endpoints, check headers first
+                try:
+                    resp = self.session.head(url, timeout=15, allow_redirects=True)
+                    content_type = resp.headers.get("Content-Type", "")
+                    if "pdf" in content_type or "octet-stream" in content_type:
+                        print(f"{Colors.GREEN}PDF DISPONIBLE!{Colors.RESET}")
+                        state.objet = f"(Avis JAL disponible: {url})"
+                        state.page_hash = hashlib.md5(url.encode()).hexdigest()
+                        return state
+                    # Try GET to see content
+                    html = self._http_get(url)
+                    if html and not self._is_access_denied(html):
+                        print(f"{Colors.GREEN}ACCESSIBLE{Colors.RESET}")
+                        header = self._extract_header_from_html(html)
+                        if header.get("reference") or header.get("objet"):
+                            state.objet = header.get("objet", "")
+                            state.date_limite = header.get("date_limite", "")
+                            state.statut = header.get("statut", "")
+                            state.page_hash = hashlib.md5(html.encode()).hexdigest()
+                            return state
+                    else:
+                        print(f"{Colors.DIM}bloque{Colors.RESET}")
+                except Exception:
+                    print(f"{Colors.DIM}erreur{Colors.RESET}")
+
+            elif strategy["type"] == "cache":
+                # Google cache — different host, might work
+                try:
+                    html = self._http_get(url)
+                    if html and not self._is_access_denied(html) and str(ref) in html:
+                        print(f"{Colors.GREEN}CACHE TROUVE!{Colors.RESET}")
+                        header = self._extract_header_from_html(html)
+                        if header.get("objet") or header.get("date_limite"):
+                            state.objet = header.get("objet", "(via Google Cache)")
+                            state.date_limite = header.get("date_limite", "")
+                            state.statut = header.get("statut", "")
+                            state.page_hash = hashlib.md5(html.encode()).hexdigest()
+                            return state
+                    else:
+                        print(f"{Colors.DIM}pas en cache{Colors.RESET}")
+                except Exception:
+                    print(f"{Colors.DIM}erreur{Colors.RESET}")
+
+            elif strategy["type"] == "rss":
+                # RSS/Atom feed — look for ref in feed
+                try:
+                    html = self._http_get(url)
+                    if html and ("<rss" in html.lower() or "<feed" in html.lower() or "<item" in html.lower()):
+                        print(f"{Colors.GREEN}FLUX RSS TROUVE!{Colors.RESET}")
+                        if str(ref) in html:
+                            # Extract data from RSS
+                            m = re.search(rf"<title>([^<]*{ref}[^<]*)</title>", html)
+                            if m:
+                                state.objet = m.group(1).strip()
+                            m = re.search(rf"<pubDate>([^<]+)</pubDate>", html)
+                            if m:
+                                state.date_limite = m.group(1).strip()
+                            state.page_hash = hashlib.md5(html.encode()).hexdigest()
+                            return state
+                        else:
+                            print(f"  (ref {ref} pas dans le flux)")
+                    elif html and not self._is_access_denied(html):
+                        print(f"{Colors.YELLOW}page accessible (pas RSS){Colors.RESET}")
+                    else:
+                        print(f"{Colors.DIM}bloque{Colors.RESET}")
+                except Exception:
+                    print(f"{Colors.DIM}erreur{Colors.RESET}")
+
+            else:
+                # search, list, results — generic HTML check
+                try:
+                    html = self._http_get(url)
+                    if html and not self._is_access_denied(html):
+                        if str(ref) in html:
+                            print(f"{Colors.GREEN}REF TROUVEE!{Colors.RESET}")
+                            header = self._extract_header_from_html(html)
+                            if header.get("objet") or header.get("date_limite"):
+                                state.objet = header.get("objet", "")
+                                state.date_limite = header.get("date_limite", "")
+                                state.statut = header.get("statut", "")
+                            else:
+                                # Try extracting from listing
+                                state = self._extract_from_listing(html, ref)
+                            state.page_hash = hashlib.md5(html.encode()).hexdigest()
+                            return state
+                        else:
+                            print(f"{Colors.YELLOW}accessible (ref absente){Colors.RESET}")
+                    else:
+                        print(f"{Colors.DIM}bloque{Colors.RESET}")
+                except Exception:
+                    print(f"{Colors.DIM}erreur{Colors.RESET}")
+
+        print(f"{Colors.RED}    Aucune strategie n'a fonctionne.{Colors.RESET}")
         return state
 
     def _http_search_annonces(self, ref):
@@ -780,6 +956,56 @@ class PublicTracker:
                     print(f"{Colors.DIM}bloque/redirige{Colors.RESET}")
 
                 time.sleep(2)  # Avoid hammering the server
+
+            findings.append("")
+
+            # ── Phase 3b: Smart bypass strategies via Selenium ──
+            print(f"\n{Colors.CYAN}[3b/6] Strategies de bypass intelligent...{Colors.RESET}")
+            findings.append("\n=== STRATEGIES DE BYPASS ===")
+
+            for strategy in BYPASS_STRATEGIES:
+                if strategy["needs_org"] and not org:
+                    continue
+
+                name = strategy["name"]
+                bypass_url = strategy["url_template"].format(ref=ref, org=org or "")
+                print(f"  {name}...", end=" ")
+
+                try:
+                    self.driver.get(bypass_url)
+                    time.sleep(3)
+                    bypass_page = self.driver.page_source
+                    bypass_text = self.driver.find_element(By.TAG_NAME, "body").text[:1500]
+                    is_denied = self._is_access_denied(bypass_page)
+                    has_ref = str(ref) in bypass_text or str(ref) in bypass_page
+
+                    findings.append(f"\n--- {name} ---")
+                    findings.append(f"  URL: {bypass_url[:120]}")
+                    findings.append(f"  Acces refuse: {is_denied}")
+                    findings.append(f"  Ref presente: {has_ref}")
+
+                    if not is_denied and has_ref:
+                        print(f"{Colors.GREEN}DONNEES ACCESSIBLES!{Colors.RESET}")
+                        findings.append(f"  *** BYPASS REUSSI — DONNEES ACCESSIBLES ***")
+                        findings.append(f"  Apercu: {bypass_text[:300]}")
+                        # Try to extract data
+                        header = self._extract_header()
+                        if header.get("reference") or header.get("objet"):
+                            findings.append(f"  Reference: {header.get('reference', 'N/A')}")
+                            findings.append(f"  Objet: {header.get('objet', 'N/A')}")
+                            findings.append(f"  Date limite: {header.get('date_limite', 'N/A')}")
+                    elif not is_denied:
+                        print(f"{Colors.YELLOW}accessible (ref absente){Colors.RESET}")
+                        findings.append(f"  Page accessible mais ref non trouvee")
+                        findings.append(f"  Apercu: {bypass_text[:200]}")
+                    else:
+                        print(f"{Colors.DIM}bloque{Colors.RESET}")
+                        findings.append(f"  Acces refuse")
+                except Exception as e:
+                    print(f"{Colors.DIM}erreur: {str(e)[:50]}{Colors.RESET}")
+                    findings.append(f"  Erreur: {e}")
+
+                time.sleep(1)
 
             findings.append("")
 

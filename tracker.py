@@ -82,63 +82,91 @@ PUBLIC_PAGES = {
 }
 
 # Smart bypass strategies — alternative URL patterns to reach consultation data
+# Ordered by likelihood of exposing ICE/bidder data
 BYPASS_STRATEGIES = [
-    # 1. Download JAL notice (legal announcement — public document)
+    # ── ICE-targeted strategies (highest priority) ──
+    # 1. Agent registre page — directly request agent page without auth
+    #    type=1 = Retraits, type=3 = Questions, type=5 = Dépôts
     {
-        "name": "Avis JAL (annonce legale)",
-        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseDownloadAvisJAL"
-                        "&refConsultation={ref}&orgAcronyme={org}",
-        "needs_org": True,
-        "type": "download",
+        "name": "Agent Registre Retraits (type=1)",
+        "url_template": BASE_URL + "/index.php?page=agent.GestionRegistres"
+                        "&ref={ref}&type=1",
+        "needs_org": False,
+        "type": "ice_hunt",
     },
-    # 2. Advanced search with AllCons + refConsultation filter
     {
-        "name": "Recherche avancee (AllCons + ref)",
+        "name": "Agent Registre Depots (type=5)",
+        "url_template": BASE_URL + "/index.php?page=agent.GestionRegistres"
+                        "&ref={ref}&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # 2. Entreprise registre pages — may show bidders to other registered enterprises
+    {
+        "name": "Entreprise Registres (ref)",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseRegistres"
+                        "&ref={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Entreprise Registres (refConsultation)",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseRegistres"
+                        "&refConsultation={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # 3. Agent registre without type — may default to showing all registres
+    {
+        "name": "Agent Registre (sans type)",
+        "url_template": BASE_URL + "/index.php?page=agent.GestionRegistres"
+                        "&ref={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # 4. Agent TableauDeBord — might expose summary with bidder count
+    {
+        "name": "Agent TableauDeBord",
+        "url_template": BASE_URL + "/index.php?page=agent.TableauDeBord"
+                        "&ref={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # 5. Popup observation registre — direct access to deposit entry
+    #    IDs found in auth HTML: 1257061, 1257200, 1257218
+    {
+        "name": "Popup Observation Registre (id probe)",
+        "url_template": BASE_URL + "/index.php?page=agent.popUpObservationRegistre"
+                        "&id=1257200&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # 6. Extrait PV — public post-ouverture, contains bidder names/ICE
+    {
+        "name": "Extrait PV (resultats)",
         "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseAdvancedSearch"
-                        "&AllCons&refConsultation={ref}",
+                        "&AvisExtraitPV&refConsultation={ref}",
         "needs_org": False,
-        "type": "search",
+        "type": "ice_hunt",
     },
-    # 3. Alternative /pmmp/spg/ path (non-PRADO routing)
+    # 7. Avis Attribution — public award notice with winning ICE
     {
-        "name": "Chemin /pmmp/spg/ (hors PRADO)",
-        "url_template": BASE_URL + "/pmmp/spg/entreprise/EntrepriseAdvancedSearch.htm"
-                        "?type=AllCons&refConsultation={ref}",
+        "name": "Avis Attribution",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseAdvancedSearch"
+                        "&AvisAttribution&refConsultation={ref}",
         "needs_org": False,
-        "type": "search",
+        "type": "ice_hunt",
     },
-    # 4. Direct consultation via SPIP portal
-    {
-        "name": "SPIP portail (pmmp)",
-        "url_template": BASE_URL + "/pmmp/spip.php?page=backend",
-        "needs_org": False,
-        "type": "rss",
-    },
-    # 5. Google cache of the consultation page
-    {
-        "name": "Google Cache",
-        "url_template": "https://webcache.googleusercontent.com/search?q=cache:"
-                        "marchespublics.gov.ma/index.php?page=entreprise."
-                        "EntrepriseDetailsConsultation%26refConsultation={ref}",
-        "needs_org": False,
-        "type": "cache",
-    },
-    # 6. Consultation list (may show ref in results)
-    {
-        "name": "Liste consultations",
-        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseConsultationList",
-        "needs_org": False,
-        "type": "list",
-    },
-    # 7. Resultats consultation (sometimes public post-attribution)
+    # 8. Resultats consultation
     {
         "name": "Resultats consultation",
         "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseResultats"
                         "&refConsultation={ref}",
         "needs_org": False,
-        "type": "results",
+        "type": "ice_hunt",
     },
-    # 8. PopUpDetailLots — public popup showing lot details
+    # ── Metadata strategies ──
+    # 9. PopUpDetailLots — public popup showing lot details
     {
         "name": "Detail des lots (popup)",
         "url_template": BASE_URL + "/index.php?page=commun.PopUpDetailLots"
@@ -146,13 +174,20 @@ BYPASS_STRATEGIES = [
         "needs_org": True,
         "type": "search",
     },
-    # 9. DCE download page — public, shows document list
+    # 10. DCE download page
     {
         "name": "Telechargement DCE",
         "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseDemandeTelechargementDce"
                         "&refConsultation={ref}&orgAcronyme={org}",
         "needs_org": True,
         "type": "search",
+    },
+    # 11. SPIP RSS feed
+    {
+        "name": "SPIP portail (pmmp)",
+        "url_template": BASE_URL + "/pmmp/spip.php?page=backend",
+        "needs_org": False,
+        "type": "rss",
     },
 ]
 
@@ -434,16 +469,35 @@ class PublicTracker:
         if self._is_access_denied(html):
             print(f"{Colors.YELLOW}  Page details protegee. Tentative bypass intelligent...{Colors.RESET}")
             state = self._try_bypass_strategies(ref, org)
+            if state.tabs.get("_ice"):
+                return state  # Found ICE!
             if state.objet or state.date_limite:
                 return state
             # Last resort: search Annonces
             state = self._http_search_annonces(ref)
             return state
 
-        # Extract header from raw HTML
+        # Page is accessible — extract header
         header = self._extract_header_from_html(html)
         state.reference = header.get("reference", ref)
         state.objet = header.get("objet", "")
+
+        # Even though the page is accessible, try to find ICE via bypass strategies
+        # (the entreprise page doesn't show ICE but agent pages might be open)
+        if not header.get("ice_numbers"):
+            print(f"{Colors.CYAN}  Page publique OK. Recherche ICE via bypass...{Colors.RESET}")
+            bypass_state = self._try_bypass_strategies(ref, org or header.get("org_acronyme"))
+            if bypass_state.tabs.get("_ice"):
+                state.tabs["_ice"] = bypass_state.tabs["_ice"]
+                print(f"{Colors.GREEN}  ICE trouves via bypass!{Colors.RESET}")
+
+            # Try PRADO callback as last resort for ICE
+            if not state.tabs.get("_ice"):
+                print(f"{Colors.CYAN}  Tentative PRADO callback POST...{Colors.RESET}")
+                prado_ice = self._try_prado_callback(ref, org or header.get("org_acronyme"))
+                if prado_ice:
+                    state.tabs["_ice"] = {"text": ", ".join(prado_ice)}
+                    print(f"{Colors.GREEN}  ICE trouves via PRADO callback!{Colors.RESET}")
         state.date_limite = header.get("date_limite", "")
         state.statut = header.get("statut", "")
         state.organisme = header.get("organisme", "")
@@ -490,10 +544,11 @@ class PublicTracker:
         return state
 
     def _try_bypass_strategies(self, ref, org=None):
-        """Try multiple smart strategies to access consultation data without direct auth."""
+        """Try multiple smart strategies to access ICE/bidder data without auth."""
         state = ConsultationState()
         state.reference = str(ref)
-        org = org or ""
+        org = org or KNOWN_ORG_ACRONYMS.get(str(ref), "")
+        found_ice = []
 
         for strategy in BYPASS_STRATEGIES:
             if strategy["needs_org"] and not org:
@@ -501,104 +556,161 @@ class PublicTracker:
 
             name = strategy["name"]
             url = strategy["url_template"].format(ref=ref, org=org)
+            stype = strategy["type"]
 
             print(f"{Colors.DIM}    Strategie: {name}...{Colors.RESET}", end=" ")
 
-            if strategy["type"] == "download":
-                # For download endpoints, check headers first
-                try:
-                    resp = self.session.head(url, timeout=15, allow_redirects=True)
-                    content_type = resp.headers.get("Content-Type", "")
-                    if "pdf" in content_type or "octet-stream" in content_type:
-                        print(f"{Colors.GREEN}PDF DISPONIBLE!{Colors.RESET}")
-                        state.objet = f"(Avis JAL disponible: {url})"
-                        state.page_hash = hashlib.md5(url.encode()).hexdigest()
-                        return state
-                    # Try GET to see content
-                    html = self._http_get(url)
-                    if html and not self._is_access_denied(html):
-                        print(f"{Colors.GREEN}ACCESSIBLE{Colors.RESET}")
+            try:
+                html = self._http_get(url)
+                if not html:
+                    print(f"{Colors.DIM}pas de reponse{Colors.RESET}")
+                    continue
+
+                is_denied = self._is_access_denied(html)
+
+                if stype == "ice_hunt":
+                    # Primary goal: find ICE numbers in the response
+                    ice_numbers = re.findall(r'ICE:\s*(\d{15})', html)
+                    if ice_numbers:
+                        print(f"{Colors.GREEN}*** ICE TROUVES: {ice_numbers} ***{Colors.RESET}")
+                        found_ice.extend(ice_numbers)
+                        # Extract full data from the page
                         header = self._extract_header_from_html(html)
-                        if header.get("reference") or header.get("objet"):
+                        state.objet = header.get("objet", state.objet)
+                        state.date_limite = header.get("date_limite", state.date_limite)
+                        state.organisme = header.get("organisme", state.organisme)
+                        state.tabs["_ice"] = {"text": ", ".join(set(found_ice))}
+                        if header.get("nombre_depots"):
+                            state.tabs["_depots"] = {"text": f"Nombre depots: {header['nombre_depots']}"}
+                        state.page_hash = hashlib.md5(html.encode()).hexdigest()
+                        # Don't return yet — try more strategies to find additional ICE
+                        continue
+
+                    # No ICE found — but check if page is accessible (might have other data)
+                    if not is_denied:
+                        # Check for bidder-related content even without ICE pattern
+                        has_bidder_data = any(kw in html.lower() for kw in [
+                            "registre", "retrait", "dépôt", "depot",
+                            "nombre de", "soumissionnaire", "table-results",
+                        ])
+                        if has_bidder_data:
+                            print(f"{Colors.YELLOW}page accessible (donnees registre sans ICE){Colors.RESET}")
+                            # Save page for analysis
+                            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            fname = f"bypass_{name.replace(' ', '_')}_{ref}_{ts}.html"
+                            try:
+                                with open(fname, "w", encoding="utf-8") as f:
+                                    f.write(html)
+                                print(f"    Sauvegarde: {fname}")
+                            except Exception:
+                                pass
+                        else:
+                            print(f"{Colors.DIM}accessible mais pas de donnees bidder{Colors.RESET}")
+                    else:
+                        print(f"{Colors.DIM}bloque{Colors.RESET}")
+
+                elif stype == "rss":
+                    if "<rss" in html.lower() or "<feed" in html.lower() or "<item" in html.lower():
+                        print(f"{Colors.GREEN}FLUX RSS TROUVE!{Colors.RESET}")
+                        # Check for ICE in RSS
+                        ice_in_rss = re.findall(r'ICE:\s*(\d{15})', html)
+                        if ice_in_rss:
+                            found_ice.extend(ice_in_rss)
+                            print(f"    ICE dans RSS: {ice_in_rss}")
+                    else:
+                        print(f"{Colors.DIM}pas RSS{Colors.RESET}")
+
+                else:
+                    # search, list type — look for ICE first, then metadata
+                    ice_numbers = re.findall(r'ICE:\s*(\d{15})', html)
+                    if ice_numbers:
+                        print(f"{Colors.GREEN}*** ICE TROUVES: {ice_numbers} ***{Colors.RESET}")
+                        found_ice.extend(ice_numbers)
+
+                    if not is_denied and str(ref) in html:
+                        print(f"{Colors.GREEN}REF TROUVEE!{Colors.RESET}")
+                        header = self._extract_header_from_html(html)
+                        if header.get("objet"):
                             state.objet = header.get("objet", "")
                             state.date_limite = header.get("date_limite", "")
-                            state.statut = header.get("statut", "")
-                            state.page_hash = hashlib.md5(html.encode()).hexdigest()
-                            return state
+                        state.page_hash = hashlib.md5(html.encode()).hexdigest()
+                    elif not is_denied:
+                        print(f"{Colors.YELLOW}accessible (ref absente){Colors.RESET}")
                     else:
                         print(f"{Colors.DIM}bloque{Colors.RESET}")
-                except Exception:
-                    print(f"{Colors.DIM}erreur{Colors.RESET}")
 
-            elif strategy["type"] == "cache":
-                # Google cache — different host, might work
-                try:
-                    html = self._http_get(url)
-                    if html and not self._is_access_denied(html) and str(ref) in html:
-                        print(f"{Colors.GREEN}CACHE TROUVE!{Colors.RESET}")
-                        header = self._extract_header_from_html(html)
-                        if header.get("objet") or header.get("date_limite"):
-                            state.objet = header.get("objet", "(via Google Cache)")
-                            state.date_limite = header.get("date_limite", "")
-                            state.statut = header.get("statut", "")
-                            state.page_hash = hashlib.md5(html.encode()).hexdigest()
-                            return state
-                    else:
-                        print(f"{Colors.DIM}pas en cache{Colors.RESET}")
-                except Exception:
-                    print(f"{Colors.DIM}erreur{Colors.RESET}")
+            except Exception as e:
+                print(f"{Colors.DIM}erreur: {str(e)[:50]}{Colors.RESET}")
 
-            elif strategy["type"] == "rss":
-                # RSS/Atom feed — look for ref in feed
-                try:
-                    html = self._http_get(url)
-                    if html and ("<rss" in html.lower() or "<feed" in html.lower() or "<item" in html.lower()):
-                        print(f"{Colors.GREEN}FLUX RSS TROUVE!{Colors.RESET}")
-                        if str(ref) in html:
-                            # Extract data from RSS
-                            m = re.search(rf"<title>([^<]*{ref}[^<]*)</title>", html)
-                            if m:
-                                state.objet = m.group(1).strip()
-                            m = re.search(rf"<pubDate>([^<]+)</pubDate>", html)
-                            if m:
-                                state.date_limite = m.group(1).strip()
-                            state.page_hash = hashlib.md5(html.encode()).hexdigest()
-                            return state
-                        else:
-                            print(f"  (ref {ref} pas dans le flux)")
-                    elif html and not self._is_access_denied(html):
-                        print(f"{Colors.YELLOW}page accessible (pas RSS){Colors.RESET}")
-                    else:
-                        print(f"{Colors.DIM}bloque{Colors.RESET}")
-                except Exception:
-                    print(f"{Colors.DIM}erreur{Colors.RESET}")
+        # Summary
+        if found_ice:
+            unique_ice = list(set(found_ice))
+            state.tabs["_ice"] = {"text": ", ".join(unique_ice)}
+            print(f"\n{Colors.GREEN}  === ICE DECOUVERTS SANS AUTH: {unique_ice} ==={Colors.RESET}")
+        else:
+            print(f"{Colors.RED}    Aucune strategie n'a expose les ICE.{Colors.RESET}")
 
-            else:
-                # search, list, results — generic HTML check
-                try:
-                    html = self._http_get(url)
-                    if html and not self._is_access_denied(html):
-                        if str(ref) in html:
-                            print(f"{Colors.GREEN}REF TROUVEE!{Colors.RESET}")
-                            header = self._extract_header_from_html(html)
-                            if header.get("objet") or header.get("date_limite"):
-                                state.objet = header.get("objet", "")
-                                state.date_limite = header.get("date_limite", "")
-                                state.statut = header.get("statut", "")
-                            else:
-                                # Try extracting from listing
-                                state = self._extract_from_listing(html, ref)
-                            state.page_hash = hashlib.md5(html.encode()).hexdigest()
-                            return state
-                        else:
-                            print(f"{Colors.YELLOW}accessible (ref absente){Colors.RESET}")
-                    else:
-                        print(f"{Colors.DIM}bloque{Colors.RESET}")
-                except Exception:
-                    print(f"{Colors.DIM}erreur{Colors.RESET}")
-
-        print(f"{Colors.RED}    Aucune strategie n'a fonctionne.{Colors.RESET}")
         return state
+
+    def _try_prado_callback(self, ref, org=None):
+        """Try PRADO callback POST to force server to render tab data without session.
+
+        The idea: send a POST to the consultation page with PRADO_POSTBACK_TARGET
+        set to one of the tab buttons. If the server doesn't validate the session
+        on callbacks, it may render the tab content (including ICE data).
+        """
+        org = org or KNOWN_ORG_ACRONYMS.get(str(ref), "")
+        url = self._build_url(ref, org)
+
+        # First, GET the page to obtain PRADO_PAGESTATE
+        html = self._http_get(url)
+        if not html:
+            return []
+
+        pagestate_match = re.search(r'name="PRADO_PAGESTATE"[^>]*value="([^"]*)"', html)
+        if not pagestate_match:
+            return []
+
+        pagestate = pagestate_match.group(1)
+        print(f"{Colors.DIM}    PRADO callback: PAGESTATE obtenu ({len(pagestate)} chars){Colors.RESET}")
+
+        # Tab targets to try (from agent page — may also work on entreprise page)
+        callback_targets = [
+            # Agent page tab targets
+            "ctl0$CONTENU_PAGE$firstTab",      # Retraits
+            "ctl0$CONTENU_PAGE$thirdTab",       # Dépôts
+            # Refresh repeater (loads table data)
+            "ctl0$CONTENU_PAGE$registreDepotsElectronique$refreshRepeater",
+            "ctl0$CONTENU_PAGE$registreRetraitsElectronique$refreshRepeater",
+        ]
+
+        found_ice = []
+        for target in callback_targets:
+            try:
+                post_data = {
+                    "PRADO_PAGESTATE": pagestate,
+                    "PRADO_POSTBACK_TARGET": target,
+                    "PRADO_POSTBACK_PARAMETER": "",
+                }
+                print(f"{Colors.DIM}    Callback: {target}...{Colors.RESET}", end=" ")
+
+                resp = self.session.post(url, data=post_data, timeout=15, allow_redirects=True)
+                if resp.status_code == 200:
+                    resp_html = resp.text
+                    ice_numbers = re.findall(r'ICE:\s*(\d{15})', resp_html)
+                    if ice_numbers:
+                        print(f"{Colors.GREEN}*** ICE: {ice_numbers} ***{Colors.RESET}")
+                        found_ice.extend(ice_numbers)
+                    elif "table-results" in resp_html or "registre" in resp_html.lower():
+                        print(f"{Colors.YELLOW}reponse avec donnees (pas d'ICE){Colors.RESET}")
+                    else:
+                        print(f"{Colors.DIM}pas de donnees{Colors.RESET}")
+                else:
+                    print(f"{Colors.DIM}{resp.status_code}{Colors.RESET}")
+            except Exception as e:
+                print(f"{Colors.DIM}erreur: {str(e)[:40]}{Colors.RESET}")
+
+        return list(set(found_ice))
 
     def _http_search_annonces(self, ref):
         """Search for a consultation in the public Annonces page."""

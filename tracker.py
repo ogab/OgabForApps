@@ -588,8 +588,12 @@ class PublicTracker:
 
                     # No ICE found — but check if page is accessible (might have other data)
                     if not is_denied:
-                        # Check for bidder-related content even without ICE pattern
-                        has_bidder_data = any(kw in html.lower() for kw in [
+                        # Strip URL-encoded params to avoid false positives from
+                        # login redirect pages with goto=...GestionRegistres...
+                        clean_html = re.sub(r'(?:goto|redirect|url|action)=[^&"\'>\s]*', '', html, flags=re.IGNORECASE)
+                        # Also strip href/action attribute values to avoid matching URLs
+                        clean_html = re.sub(r'(?:href|action)="[^"]*"', '', clean_html, flags=re.IGNORECASE)
+                        has_bidder_data = any(kw in clean_html.lower() for kw in [
                             "registre", "retrait", "dépôt", "depot",
                             "nombre de", "soumissionnaire", "table-results",
                         ])
@@ -819,6 +823,11 @@ class PublicTracker:
             return False
         text = html.lower() if len(html) < 50000 else html[:50000].lower()
 
+        # Agent login redirect: form action contains agent.AgentHome with goto param
+        # This is a definitive redirect — the page is a login form, not data
+        if 'agent.agenthome' in text and 'goto=' in text:
+            return True
+
         # Check for true access denial
         has_denial = any(ind.lower() in text for ind in ACCESS_DENIED_INDICATORS)
         if not has_denial:
@@ -831,7 +840,6 @@ class PublicTracker:
             "référence",
             "recap-consultation",
             "acheteur public",
-            "registre",
             "table-results",
         ])
         return not has_content

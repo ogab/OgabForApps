@@ -1,0 +1,26 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head> <!-- 4 --> <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/> <title>Marchés publics électroniques </title></head><body><form id="ctl0_ctl4" method="post" action="/index.php?page=agent.GestionRegistres&amp;ref=979388&amp;type=5" name="main_form"><div style="visibility:hidden;"><input type="hidden" name="PRADO_PAGESTATE" id="PRADO_PAGESTATE" value="[PAGESTATE_SAVED]" /><input type="hidden" name="PRADO_POSTBACK_TARGET" id="PRADO_POSTBACK_TARGET" value="" /><input type="hidden" name="PRADO_POSTBACK_PARAMETER" id="PRADO_POSTBACK_PARAMETER" value="" /></div>
+<!-- KEY STRUCTURE NOTES:
+  URL: /index.php?page=agent.GestionRegistres&ref=979388&type=5
+  Tabs: firstTab=Retraits, secondTab=Questions, thirdTab=Dépôts
+  Type parameter: type=5 for Dépôts (type=1 likely Retraits)
+
+  Data extraction selectors:
+  - Reference: #ctl0_CONTENU_PAGE_ConsultationSummary_reference
+  - Objet: #ctl0_CONTENU_PAGE_ConsultationSummary_objet
+  - Date limite: #ctl0_CONTENU_PAGE_ConsultationSummary_dateFin
+  - Service: #ctl0_CONTENU_PAGE_ConsultationSummary_service
+  - Nombre depots: #ctl0_CONTENU_PAGE_registreDepotsElectronique_nombreResultat
+  - Table: .table-results tbody tr
+  - ICE pattern in cells: ICE:\d{15}
+
+  PRADO Callbacks:
+  - Tab Retraits: ctl0$CONTENU_PAGE$firstTab
+  - Tab Questions: ctl0$CONTENU_PAGE$secondTab
+  - Tab Dépôts: ctl0$CONTENU_PAGE$thirdTab
+  - Refresh: ctl0$CONTENU_PAGE$registreDepotsElectronique$refreshRepeater
+  - Export XLS: ctl0$CONTENU_PAGE$ctl18
+  - Export PDF: ctl0$CONTENU_PAGE$ctl19
+  - Sort by num: ctl0$CONTENU_PAGE$registreDepotsElectronique$dataListRegistre$ctl0$trierNum
+  - Sort by entreprise: ctl0$CONTENU_PAGE$registreDepotsElectronique$dataListRegistre$ctl0$trierEntreprise
+-->
+</form></body></html>

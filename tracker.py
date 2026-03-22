@@ -138,15 +138,66 @@ BYPASS_STRATEGIES = [
         "needs_org": False,
         "type": "results",
     },
+    # 8. PopUpDetailLots — public popup showing lot details
+    {
+        "name": "Detail des lots (popup)",
+        "url_template": BASE_URL + "/index.php?page=commun.PopUpDetailLots"
+                        "&orgAccronyme={org}&refConsultation={ref}&lang=fr",
+        "needs_org": True,
+        "type": "search",
+    },
+    # 9. DCE download page — public, shows document list
+    {
+        "name": "Telechargement DCE",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseDemandeTelechargementDce"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "search",
+    },
 ]
 
 # Indicators that we've been denied access / redirected to login
+# NOTE: "Vous n'êtes pas authentifié" and "S'identifier" appear in the nav/menu
+# of the publicly accessible entreprise page — they are NOT indicators of access denial.
+# The entreprise consultation detail page is publicly accessible even without login.
 ACCESS_DENIED_INDICATORS = [
     "Vous n'avez pas le droit d'accéder",
-    "Vous n'êtes pas authentifié",
-    "S'identifier",
     "Accès refusé",
+    "Erreur d'authentification",
+    "Session expirée",
 ]
+
+# Known org acronyms discovered from HTML analysis
+# orgAcronyme is required for entreprise.EntrepriseDetailsConsultation
+KNOWN_ORG_ACRONYMS = {
+    # ref -> orgAcronyme (discovered from inspect element or previous scrapes)
+    "979388": "q1s",
+}
+
+# CSS selectors for data extraction on entreprise page (publicly accessible)
+ENTREPRISE_SELECTORS = {
+    "reference": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_reference",
+    "objet": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_objet",
+    "date_limite": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_dateHeureLimiteRemisePlis",
+    "acheteur": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_entiteAchat",
+    "annonce": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_annonce",
+    "procedure": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_typeProcedure",
+    "categorie": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_categoriePrincipale",
+    "lots": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_nbrLots",
+    "lieu_execution": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_lieuxExecutions",
+    "contact": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_contactAdministratif",
+    "email": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_email",
+    "telephone": "ctl0_CONTENU_PAGE_idEntrepriseConsultationSummary_telephone",
+}
+
+# CSS selectors for data extraction on agent page (requires auth)
+AGENT_SELECTORS = {
+    "reference": "ctl0_CONTENU_PAGE_ConsultationSummary_reference",
+    "objet": "ctl0_CONTENU_PAGE_ConsultationSummary_objet",
+    "date_limite": "ctl0_CONTENU_PAGE_ConsultationSummary_dateFin",
+    "acheteur": "ctl0_CONTENU_PAGE_ConsultationSummary_service",
+    "nombre_depots": "ctl0_CONTENU_PAGE_registreDepotsElectronique_nombreResultat",
+}
 
 
 class PublicTracker:
@@ -275,45 +326,96 @@ class PublicTracker:
                     return None
 
     def _extract_header_from_html(self, html):
-        """Extract header info using regex (works with raw HTML, no Selenium needed)."""
-        info = {"reference": "", "objet": "", "date_limite": "", "statut": "", "organisme": ""}
+        """Extract header info using regex (works with raw HTML, no Selenium needed).
+
+        Supports both entreprise page (public) and agent page (auth) HTML structures.
+        Uses known element IDs for precise extraction, with regex fallback.
+        """
+        info = {"reference": "", "objet": "", "date_limite": "", "statut": "", "organisme": "",
+                "contact": "", "email": "", "telephone": "", "lots": "", "org_acronyme": ""}
         if not html:
             return info
 
-        # Reference
-        m = re.search(r"R[ée]f[ée]rence\s*:?\s*</[^>]+>\s*([^<]+)", html)
-        if not m:
-            m = re.search(r"R[ée]f[ée]rence\s*:?\s*([^<\n]+)", html)
-        if m:
-            info["reference"] = m.group(1).strip()
+        def _extract_by_id(element_id):
+            """Extract text content from a span/div with given ID."""
+            m = re.search(
+                rf'id="{re.escape(element_id)}"[^>]*>([^<]+)',
+                html
+            )
+            return m.group(1).strip() if m else ""
 
-        # Objet
-        m = re.search(r"Objet\s*(?:de la consultation)?\s*:?\s*</[^>]+>\s*([^<]+)", html)
-        if not m:
-            m = re.search(r"Objet\s*:?\s*([^<\n]+)", html)
-        if m:
-            info["objet"] = m.group(1).strip()
+        # Detect page type: entreprise (public) or agent (auth)
+        is_entreprise = "EntrepriseDetailsConsultation" in html or "idEntrepriseConsultationSummary" in html
+        is_agent = "GestionRegistres" in html or "ConsultationSummary_reference" in html
 
-        # Date limite
-        m = re.search(r"Date\s+et\s+heure\s+limite[^:]*:\s*</[^>]+>\s*([^<]+)", html)
-        if not m:
-            m = re.search(r"Date\s+et\s+heure\s+limite[^:]*:\s*([^<\n]+)", html)
-        if m:
-            info["date_limite"] = m.group(1).strip()
+        if is_entreprise:
+            selectors = ENTREPRISE_SELECTORS
+        elif is_agent:
+            selectors = AGENT_SELECTORS
+        else:
+            selectors = {}
 
-        # Statut
+        # Try ID-based extraction first (most reliable)
+        if selectors:
+            info["reference"] = _extract_by_id(selectors.get("reference", ""))
+            info["objet"] = _extract_by_id(selectors.get("objet", ""))
+            info["date_limite"] = _extract_by_id(selectors.get("date_limite", ""))
+            info["organisme"] = _extract_by_id(selectors.get("acheteur", ""))
+
+            if is_entreprise:
+                info["contact"] = _extract_by_id(selectors.get("contact", ""))
+                info["email"] = _extract_by_id(selectors.get("email", ""))
+                info["telephone"] = _extract_by_id(selectors.get("telephone", ""))
+                info["lots"] = _extract_by_id(selectors.get("lots", ""))
+
+        # Extract orgAcronyme from form action or links
+        m = re.search(r'orgAcronyme=([a-zA-Z0-9]+)', html)
+        if m:
+            info["org_acronyme"] = m.group(1)
+
+        # Regex fallback for fields not found via ID
+        if not info["reference"]:
+            m = re.search(r"R[ée]f[ée]rence\s*:?\s*</[^>]+>\s*([^<]+)", html)
+            if not m:
+                m = re.search(r"R[ée]f[ée]rence\s*:?\s*([^<\n]+)", html)
+            if m:
+                info["reference"] = m.group(1).strip()
+
+        if not info["objet"]:
+            m = re.search(r"Objet\s*(?:de la consultation)?\s*:?\s*</[^>]+>\s*([^<]+)", html)
+            if not m:
+                m = re.search(r"Objet\s*:?\s*([^<\n]+)", html)
+            if m:
+                info["objet"] = m.group(1).strip()
+
+        if not info["date_limite"]:
+            m = re.search(r"Date\s+et\s+heure\s+limite[^:]*:\s*</[^>]+>\s*([^<]+)", html)
+            if not m:
+                m = re.search(r"Date\s+et\s+heure\s+limite[^:]*:\s*([^<\n]+)", html)
+            if m:
+                info["date_limite"] = m.group(1).strip()
+
+        if not info["organisme"]:
+            m = re.search(r"Organisme\s*:?\s*</[^>]+>\s*([^<]+)", html)
+            if not m:
+                m = re.search(r"Acheteur\s*(?:public)?\s*:?\s*</[^>]+>\s*([^<]+)", html)
+            if m:
+                info["organisme"] = m.group(1).strip()
+
+        # Statut (agent page only)
         m = re.search(r"Statut\s*:?\s*</[^>]+>\s*([^<]+)", html)
         if not m:
             m = re.search(r"Statut\s*:?\s*([^<\n]+)", html)
         if m:
             info["statut"] = m.group(1).strip()
 
-        # Organisme
-        m = re.search(r"Organisme\s*:?\s*</[^>]+>\s*([^<]+)", html)
-        if not m:
-            m = re.search(r"Acheteur\s*:?\s*</[^>]+>\s*([^<]+)", html)
-        if m:
-            info["organisme"] = m.group(1).strip()
+        # Extract ICE numbers from depot/retrait tables (agent page)
+        info["ice_numbers"] = re.findall(r'ICE:\s*(\d{15})', html)
+
+        # Extract nombre de depots (agent page)
+        nombre_depots = _extract_by_id("ctl0_CONTENU_PAGE_registreDepotsElectronique_nombreResultat")
+        if nombre_depots:
+            info["nombre_depots"] = nombre_depots
 
         return info
 
@@ -345,6 +447,23 @@ class PublicTracker:
         state.date_limite = header.get("date_limite", "")
         state.statut = header.get("statut", "")
         state.organisme = header.get("organisme", "")
+
+        # Save discovered orgAcronyme for future use
+        discovered_org = header.get("org_acronyme", "")
+        if discovered_org and str(ref) not in KNOWN_ORG_ACRONYMS:
+            KNOWN_ORG_ACRONYMS[str(ref)] = discovered_org
+            print(f"{Colors.GREEN}  orgAcronyme decouvert: {discovered_org}{Colors.RESET}")
+
+        # Store extra fields from entreprise page
+        if header.get("contact"):
+            state.tabs["_contact"] = {"text": f"{header['contact']} | {header.get('email', '')} | {header.get('telephone', '')}"}
+        if header.get("lots"):
+            state.tabs["_lots"] = {"text": header["lots"]}
+        if header.get("ice_numbers"):
+            state.tabs["_ice"] = {"text": ", ".join(header["ice_numbers"])}
+            print(f"{Colors.GREEN}  ICE trouves: {header['ice_numbers']}{Colors.RESET}")
+        if header.get("nombre_depots"):
+            state.tabs["_depots"] = {"text": f"Nombre depots: {header['nombre_depots']}"}
 
         # Extract visible text for change detection
         try:
@@ -566,17 +685,44 @@ class PublicTracker:
     # ── URL construction ──
 
     def _build_url(self, ref, org=None):
+        # Auto-discover orgAcronyme from known mapping
+        if not org:
+            org = KNOWN_ORG_ACRONYMS.get(str(ref))
         url = f"{BASE_URL}/index.php?page=entreprise.EntrepriseDetailsConsultation&refConsultation={ref}"
         if org:
             url += f"&orgAcronyme={org}"
         return url
 
     def _is_access_denied(self, html):
-        """Check if page shows access denied / login required."""
+        """Check if page shows actual access denial (not just unauthenticated nav bar).
+
+        IMPORTANT: The entreprise page shows 'Vous n'êtes pas authentifié' in the
+        navigation bar and 'S'identifier' in the left menu, but the page content IS
+        fully served with consultation details. These are NOT access denial indicators.
+
+        True access denial shows 'Accès refusé' or redirects to a login-only page
+        without any consultation content.
+        """
         if not html:
             return False
         text = html.lower() if len(html) < 50000 else html[:50000].lower()
-        return any(ind.lower() in text for ind in ACCESS_DENIED_INDICATORS)
+
+        # Check for true access denial
+        has_denial = any(ind.lower() in text for ind in ACCESS_DENIED_INDICATORS)
+        if not has_denial:
+            return False
+
+        # Even with denial indicators, if we can see consultation data, page is accessible
+        has_content = any(marker in text for marker in [
+            "objet de la consultation",
+            "date et heure limite",
+            "référence",
+            "recap-consultation",
+            "acheteur public",
+            "registre",
+            "table-results",
+        ])
+        return not has_content
 
     # ── Page loading with retry ──
 

@@ -1572,7 +1572,7 @@ class PublicTracker:
         ref = self.refs[0]
         org = self.org
 
-        if not self.use_http:
+        if not self.session:
             self.use_http = True
             self._init_http_session()
 

